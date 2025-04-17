@@ -27,9 +27,6 @@ def handle_message(event):
     text = event.message.text.strip()
     user_id = event.source.user_id
 
-    # profile = line_bot_api.get_profile(user_id)
-    # user_name = profile.display_name
-
     if text.startswith('/order1'):
         drink = text[8:]
         orders1.append(drink)
@@ -42,7 +39,7 @@ def handle_message(event):
         orders2.append(food)
         line_bot_api.reply_message(
             event.reply_token,
-            TextSendMessage(text=f'已於 order2 記錄你的餐點品項：{drink}')
+            TextSendMessage(text=f'已於 order2 記錄你的餐點品項：{food}')
         )
     elif text == '/stat1':
         if not orders1:
