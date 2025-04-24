@@ -3,64 +3,45 @@ from linebot import LineBotApi, WebhookHandler
 from linebot.exceptions import InvalidSignatureError
 from linebot.models import MessageEvent, TextMessage, TextSendMessage
 
+import libsql_experimental as libsql
 import sqlite3
 import os
-
-# from dotenv import load_dotenv
-# load_dotenv(dotenv_path='.env') 
 
 app = Flask(__name__)
 
 line_bot_api = LineBotApi(os.getenv('CHANNEL_ACCESS_TOKEN'))
 line_handler = WebhookHandler(os.getenv('CHANNEL_SECRET'))
 
-def init_db():
-    conn = sqlite3.connect('orders.db')
-    cursor = conn.cursor()
-    cursor.execute('''
-        CREATE TABLE IF NOT EXISTS orders (
-            id INTEGER PRIMARY KEY AUTOINCREMENT,
-            user_id TEXT,
-            category TEXT,
-            item TEXT
-        )
-    ''')
-    conn.commit()
-    conn.close()
-
-init_db()
+url = os.getenv("TURSO_DATABASE_URL")
+auth_token = os.getenv("TURSO_AUTH_TOKEN")
 
 def insert_order(user_id, category, drink):
-    conn = sqlite3.connect('orders.db')
+    conn = libsql.connect(database=url, auth_token=auth_token)
     cursor = conn.cursor()
     cursor.execute('''
         INSERT INTO orders (user_id, category, item)
         VALUES (?, ?, ?)
     ''', (user_id, category, drink))
     conn.commit()
-    conn.close()
 
 def fetch_orders(category):
-    conn = sqlite3.connect('orders.db')
+    conn = libsql.connect(database=url, auth_token=auth_token)
     cursor = conn.cursor()
     cursor.execute('SELECT item FROM orders WHERE category = ?', (category,))
     rows = cursor.fetchall()
-    conn.close()
     return rows
 
 def delete_orders_by_category(category):
-    conn = sqlite3.connect('orders.db')
+    conn = libsql.connect(database=url, auth_token=auth_token)
     cursor = conn.cursor()
     cursor.execute('DELETE FROM orders WHERE category = ?', (category,))
     conn.commit()
-    conn.close()
 
 def delete_orders():
-    conn = sqlite3.connect('orders.db')
+    conn = libsql.connect(database=url, auth_token=auth_token)
     cursor = conn.cursor()
     cursor.execute('DELETE FROM orders')
     conn.commit()
-    conn.close()
  
 @app.route("/callback", methods=['POST'])
 def callback():
@@ -77,12 +58,8 @@ def handle_message(event):
     text = event.message.text.strip()
     user_id = event.source.user_id
 
-    # profile = line_bot_api.get_profile(user_id)
-    # user_name = profile.display_name
-
     if text.startswith('/order1'):
         drink = text[8:]
-        # orders1.append(drink)
         insert_order(user_id, 1, drink)
         line_bot_api.reply_message(
             event.reply_token,
@@ -90,7 +67,6 @@ def handle_message(event):
         )
     elif text.startswith('/order2'):
         food = text[8:]
-        # orders2.append(food)
         insert_order(user_id, 2, food)
         line_bot_api.reply_message(
             event.reply_token,
