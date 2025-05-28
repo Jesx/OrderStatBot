@@ -15,21 +15,29 @@ line_handler = WebhookHandler(os.getenv('CHANNEL_SECRET'))
 url = os.getenv("TURSO_DATABASE_URL")
 auth_token = os.getenv("TURSO_AUTH_TOKEN")
 
-def insert_order(user_id, category, drink):
+def insert_order(category, item):
     conn = libsql.connect(database=url, auth_token=auth_token)
     cursor = conn.cursor()
     cursor.execute('''
-        INSERT INTO orders (user_id, category, item)
-        VALUES (?, ?, ?)
-    ''', (user_id, category, drink))
+        INSERT INTO orders (category, item)
+        VALUES (?, ?)
+    ''', (category, item))
     conn.commit()
 
 def fetch_orders(category):
     conn = libsql.connect(database=url, auth_token=auth_token)
     cursor = conn.cursor()
-    cursor.execute('SELECT item FROM orders WHERE category = ?', (category,))
+    cursor.execute('SELECT id, item FROM orders WHERE category = ?', (category,))
     rows = cursor.fetchall()
     return rows
+
+def update_order(id, category, new_item):
+    conn = libsql.connect(database=url, auth_token=auth_token)
+    cursor = conn.cursor()
+    cursor.execute('UPDATE orders SET item = ? WHERE id = ? AND category = ?', (new_item, id, category))
+    conn.commit()
+    updated = cursor.rowcount
+    return updated
 
 def delete_orders_by_category(category):
     conn = libsql.connect(database=url, auth_token=auth_token)
@@ -60,14 +68,14 @@ def handle_message(event):
 
     if text.startswith('/order1'):
         drink = text[8:]
-        insert_order(user_id, 1, drink)
+        insert_order(1, drink)
         line_bot_api.reply_message(
             event.reply_token,
             TextSendMessage(text=f'已於 order1 記錄你的餐點品項：{drink}')
         )
     elif text.startswith('/order2'):
         food = text[8:]
-        insert_order(user_id, 2, food)
+        insert_order(2, food)
         line_bot_api.reply_message(
             event.reply_token,
             TextSendMessage(text=f'已於 order2 記錄你的餐點品項：{food}')
@@ -77,7 +85,7 @@ def handle_message(event):
         if not orders1:
             msg = 'No orders in order1.'
         else:
-            msg = '\n'.join([f'{i}. {drink}' for i, (drink,) in enumerate(orders1, 1)])
+            msg = '\n'.join([f'{i}. [{id}] {drink}' for i, (id, drink) in enumerate(orders1, 1)])
         line_bot_api.reply_message(
             event.reply_token,
             TextSendMessage(text=msg)
@@ -87,10 +95,30 @@ def handle_message(event):
         if not orders2:
             msg = 'No orders in order2.'
         else:
-            msg = '\n'.join([f'{i}. {food}' for i, (food,) in enumerate(orders2, 1)])
+            msg = '\n'.join([f'{i}. [{id}] {food}' for i, (id, food) in enumerate(orders2, 1)])
         line_bot_api.reply_message(
             event.reply_token,
             TextSendMessage(text=msg)
+        )
+    elif text.startswith('/update1'):
+        full_str = text[9:]
+        str = full_str.split(', ')
+        num = str[0]
+        new_drink = str[1]
+        update_order(num, 1, new_drink)
+        line_bot_api.reply_message(
+            event.reply_token,
+            TextSendMessage(text=f'已於 order1 更新你的餐點品項：{new_drink}')
+        )
+    elif text.startswith('/update2'):
+        full_str = text[9:]
+        str = full_str.split(', ')
+        num = str[0]
+        new_food = str[1]
+        update_order(num, 2, new_food)
+        line_bot_api.reply_message(
+            event.reply_token,
+            TextSendMessage(text=f'已於 order2 更新你的餐點品項：{new_food}')
         )
     elif text == '/clear1':
         delete_orders_by_category(1)
